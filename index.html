@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>互動攀岩牆模擬器 v3.0 · Route Voice & Guess Song Edition</title>
+<style>
+  :root {
+    --bg-deep: #0d0e1a;
+    --bg-mid: #161830;
+    --bg-rock: #1c1e2e;
+    --rock-stone: #3a3a4a;
+    --rock-shadow: #1a1c28;
+    --neon-blue: #00d4ff;
+    --neon-red: #ff3366;
+    --neon-purple: #a855f7;
+    --neon-gold: #ffd700;
+    --neon-green: #00ff88;
+    --neon-pink: #ff66cc;
+    --neon-cyan: #00ffff;
+    --neon-orange: #ff8800;
+    --text-light: #fff8e7;
+    --route-yellow: #ffd700;
+    --route-red: #ff3366;
+    --route-blue: #00d4ff;
+    --route-green: #00ff88;
+    --route-purple: #a855f7;
+    --route-pink: #ff66cc;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: 
+      radial-gradient(ellipse at 10% 0%, rgba(168, 85, 247, 0.18), transparent 50%),
+      radial-gradient(ellipse at 90% 100%, rgba(0, 212, 255, 0.15), transparent 50%),
+      linear-gradient(180deg, var(--bg-deep) 0%, var(--bg-mid) 100%);
+    min-height: 100vh;
+    font-family: 'Trebuchet MS', '微軟正黑體', sans-serif;
+    color: var(--text-light);
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Vertical light beams in background (like climbing gym lighting) */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(90deg, transparent 0%, rgba(255, 215, 0, 0.03) 50%, transparent 100%),
+      linear-gradient(90deg, transparent 30%, rgba(0, 212, 255, 0.03) 50%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 12px;
+  }
+
+  /* === Banner === */
+  .banner {
+    background: linear-gradient(135deg, #2d1b69 0%, #1e1450 50%, #2d1b69 100%);
+    border: 3px solid var(--neon-gold);
+    border-radius: 12px;
+    padding: 10px 20px;
+    margin-bottom: 12px;
+    text-align: center;
+    box-shadow: 
+      0 0 20px rgba(255, 215, 0, 0.4),
+      inset 0 0 30px rgba(168, 85, 247, 0.15);
+  }
+
+  .banner h1 {
+    font-size: clamp(1.1rem, 3vw, 1.8rem);
+    color: var(--neon-gold);
+    letter-spacing: 0.25em;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    font-weight: 900;
+  }
+
+  .banner .subtitle {
+    color: var(--text-light);
+    font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+    margin-top: 4px;
+    letter-spacing: 0.2em;
+    opacity: 0.85;
+  }
+
+  /* === Layout === */
+  .game-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    gap: 12px;
+    align-items: start;
+  }
+
+  @media (max-width: 1100px) {
+    .game-layout { grid-template-columns: 1fr; }
+  }
+
+  .info-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* === Panel === */
+  .panel {
+    background: linear-gradient(135deg, rgba(45, 27, 105, 0.85) 0%, rgba(30, 20, 80, 0.85) 100%);
+    border: 2px solid var(--neon-purple);
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 
+      0 0 15px rgba(168, 85, 247, 0.3),
+      inset 0 0 20px rgba(168, 85, 247, 0.08);
+    backdrop-filter: blur(10px);
+  }
+
+  .panel h2 {
+    color: var(--neon-gold);
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 6px;
+    margin-bottom: 10px;
+    background: rgba(255, 215, 0, 0.1);
+    border-radius: 6px;
+    border: 1px solid var(--neon-gold);
+    letter-spacing: 0.15em;
+  }
+
+  /* === HUD === */
+  .hud-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .hud-cell {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--neon-blue);
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  .hud-label {
+    font-size: 0.65rem;
+    color: var(--neon-blue);
+    letter-spacing: 0.1em;
+  }
+
+  .hud-value {
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: var(--text-light);
+    text-shadow: 0 0 8px currentColor;
+    font-family: 'Courier New', monospace;
+    margin-top: 2px;
+  }
+
+  .hud-value.time { color: var(--neon-green); }
+  .hud-value.score { color: var(--neon-gold); }
+  .hud-value.warn { color: var(--neon-gold); animation: pulse 0.5s infinite alternate; }
+  .hud-value.crit { color: var(--neon-red); animation: pulse 0.3s infinite alternate; }
+
+  @keyframes pulse {
+    from { opacity: 0.7; transform: scale(1); }
+    to { opacity: 1; transform: scale(1.05); }
+  }
+
+  /* === Mode selector === */
+  .mode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .mode-btn {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid var(--neon-purple);
+    color: var(--text-light);
+    padding: 10px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    transition: all 0.2s;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .mode-btn .mode-icon {
+    font-size: 1.4rem;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .mode-btn:hover {
+    background: rgba(168, 85, 247, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.5);
+  }
+
+  .mode-btn.active {
+    background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+    border-color: var(--neon-gold);
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.6);
+  }
+
+  /* === Control buttons === */
+  .controls {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .ctrl-btn {
+    flex: 1;
+    background: linear-gradient(135deg, var(--neon-green), #00cc66);
+    color: #0a0a14;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: 900;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+
+  .ctrl-btn.reset {
+    background: linear-gradient(135deg, var(--neon-red), #cc1144);
+    color: var(--text-light);
+  }
+
+  .ctrl-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 255, 136, 0.5);
+  }
+
+  .ctrl-btn.reset:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(255, 51, 102, 0.5);
+  }
+
+  .ctrl-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* === Wall (the climbing wall display) === */
+  .wall-container {
+    background: 
+      linear-gradient(180deg, var(--bg-rock) 0%, #14152a 100%);
+    border: 3px solid var(--neon-cyan);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 
+      0 0 25px rgba(0, 255, 255, 0.3),
+      inset 0 0 40px rgba(0, 0, 0, 0.5);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Rock texture overlay */
+  .wall-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(ellipse at 15% 20%, rgba(80, 70, 90, 0.4), transparent 30%),
+      radial-gradient(ellipse at 80% 60%, rgba(70, 80, 100, 0.3), transparent 35%),
+      radial-gradient(ellipse at 40% 90%, rgba(60, 50, 70, 0.4), transparent 30%),
+      radial-gradient(ellipse at 90% 10%, rgba(90, 80, 100, 0.3), transparent 25%);
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  .wall-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    border: 1px solid var(--neon-cyan);
+    position: relative;
+    z-index: 2;
+  }
+
+  .wall-title {
+    color: var(--neon-cyan);
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
+    font-weight: 700;
+  }
+
+  .wall-status {
+    font-size: 0.75rem;
+    color: var(--neon-green);
+    font-family: 'Courier New', monospace;
+  }
+
+  .wall-status.idle { color: var(--neon-purple); }
+  .wall-status.playing { color: var(--neon-green); }
+  .wall-status.warning { color: var(--neon-gold); }
+
+  /* === The wall (vertical aspect ratio) === */
+  .wall {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    background: 
+      radial-gradient(ellipse at center, rgba(28, 30, 46, 0.4) 0%, rgba(15, 16, 26, 0.9) 100%);
+    border-radius: 8px;
+    border: 2px solid rgba(0, 255, 255, 0.3);
+    overflow: hidden;
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.7);
+  }
+
+  /* Subtle horizontal floor markers */
+  .wall::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(0deg, transparent 0%, transparent 99%, rgba(255, 215, 0, 0.15) 100%),
+      repeating-linear-gradient(0deg, 
+        transparent 0px, 
+        transparent 80px, 
+        rgba(255, 255, 255, 0.03) 80px, 
+        rgba(255, 255, 255, 0.03) 81px);
+    pointer-events: none;
+  }
+
+  /* Top zone (finish line) */
+  .wall::after {
+    content: '🏁 終點 TOP';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--neon-gold);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    font-weight: 900;
+    text-shadow: 0 0 8px var(--neon-gold);
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  /* === Holds (rock holds on the wall) === */
+  .hold {
+    position: absolute;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.2s;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    user-select: none;
+  }
+
+  /* The hold body - looks like an actual rock with depth */
+  .hold-body {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #5a5a6a 0%, #3a3a4a 50%, #1a1c28 100%);
+    box-shadow: 
+      inset -3px -3px 6px rgba(0, 0, 0, 0.6),
+      inset 2px 2px 4px rgba(255, 255, 255, 0.1),
+      0 2px 4px rgba(0, 0, 0, 0.5);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* The LED ring around the hold */
+  .hold-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    transition: all 0.2s;
+    pointer-events: none;
+  }
+
+  /* Hold number label */
+  .hold-label {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.55rem;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    pointer-events: none;
+  }
+
+  /* === Hold states (driven by data-state attr) === */
+
+  /* Default / idle */
+  .hold[data-state="idle"] .hold-ring {
+    border-color: rgba(100, 100, 120, 0.3);
+  }
+
+  /* Active route hold - colored ring */
+  .hold[data-state="route"] .hold-ring {
+    border-color: var(--route-color, var(--neon-blue));
+    box-shadow: 
+      0 0 12px var(--route-color, var(--neon-blue)),
+      inset 0 0 6px var(--route-color, var(--neon-blue));
+    animation: routeBreath 1.6s ease-in-out infinite;
+  }
+
+  /* Next target - bright pulsing */
+  .hold[data-state="target"] .hold-ring {
+    border-color: var(--neon-gold);
+    border-width: 4px;
+    box-shadow: 
+      0 0 25px var(--neon-gold),
+      0 0 50px var(--neon-gold),
+      inset 0 0 12px var(--neon-gold);
+    animation: targetPulse 0.6s ease-in-out infinite;
+  }
+
+  .hold[data-state="target"] .hold-body {
+    background: radial-gradient(circle at 30% 30%, #ffe680 0%, #ffd700 40%, #aa8800 100%);
+  }
+
+  /* Successfully touched */
+  .hold[data-state="success"] .hold-ring {
+    border-color: var(--neon-green);
+    box-shadow: 0 0 18px var(--neon-green);
+  }
+
+  .hold[data-state="success"] .hold-body {
+    background: radial-gradient(circle at 30% 30%, #80ffb0 0%, #00ff88 40%, #008844 100%);
+  }
+
+  /* Wrong / error */
+  .hold[data-state="wrong"] .hold-ring {
+    border-color: var(--neon-red);
+    box-shadow: 0 0 20px var(--neon-red);
+    animation: shake 0.4s;
+  }
+
+  .hold[data-state="wrong"] .hold-body {
+    background: radial-gradient(circle at 30% 30%, #ff80a0 0%, #ff3366 40%, #881133 100%);
+  }
+
+  /* Random twinkle (idle decoration) */
+  .hold[data-twinkle="true"] .hold-ring {
+    animation: idleTwinkle 3s ease-in-out infinite;
+  }
+
+  @keyframes routeBreath {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.08); }
+  }
+
+  @keyframes targetPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+  }
+
+  @keyframes idleTwinkle {
+    0%, 90%, 100% { opacity: 0.3; }
+    95% { opacity: 0.9; box-shadow: 0 0 8px rgba(255, 255, 255, 0.5); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translate(-50%, -50%); }
+    20% { transform: translate(calc(-50% - 4px), -50%); }
+    40% { transform: translate(calc(-50% + 4px), -50%); }
+    60% { transform: translate(calc(-50% - 3px), -50%); }
+    80% { transform: translate(calc(-50% + 3px), -50%); }
+  }
+
+  /* Hit pop animation */
+  .hold.pop {
+    animation: holdPop 0.4s ease-out;
+  }
+
+  @keyframes holdPop {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    30% { transform: translate(-50%, -50%) scale(1.35); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+  }
+
+  /* Ripple effect when hold is touched */
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid var(--neon-gold);
+    pointer-events: none;
+    z-index: 5;
+    transform: translate(-50%, -50%);
+    animation: rippleOut 0.7s ease-out forwards;
+  }
+
+  @keyframes rippleOut {
+    0% { width: 30px; height: 30px; opacity: 1; border-width: 3px; }
+    100% { width: 120px; height: 120px; opacity: 0; border-width: 1px; }
+  }
+
+  /* Floating note */
+  .note-pop {
+    position: absolute;
+    color: var(--neon-gold);
+    font-size: 1.4rem;
+    font-weight: 900;
+    text-shadow: 0 0 10px currentColor;
+    pointer-events: none;
+    z-index: 10;
+    animation: noteFloat 1.2s ease-out forwards;
+    transform: translate(-50%, -50%);
+  }
+
+  @keyframes noteFloat {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+    20% { opacity: 1; transform: translate(-50%, -120%) scale(1.4); }
+    100% { opacity: 0; transform: translate(-50%, -250%) scale(1); }
+  }
+
+  /* === Route path connector lines === */
+  .path-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .path-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-dasharray: 4, 6;
+    opacity: 0.4;
+    animation: dashFlow 1.5s linear infinite;
+  }
+
+  @keyframes dashFlow {
+    to { stroke-dashoffset: -20; }
+  }
+
+  /* === Subtitle bar === */
+  .subtitle-bar {
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 8px;
+    border-left: 4px solid var(--neon-pink);
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s;
+  }
+
+  .subtitle-bar.speaking {
+    border-left-color: var(--neon-green);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+  }
+
+  .subtitle-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .subtitle-bar.speaking .subtitle-icon {
+    animation: speakerPulse 0.5s infinite alternate;
+  }
+
+  @keyframes speakerPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.2); }
+  }
+
+  .subtitle-text {
+    font-size: 0.88rem;
+    color: var(--text-light);
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  /* === Route info === */
+  .route-card {
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    border: 1px solid var(--neon-purple);
+    text-align: center;
+  }
+
+  .route-name {
+    color: var(--text-light);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-top: 4px;
+  }
+
+  .route-desc {
+    font-size: 0.78rem;
+    margin-top: 4px;
+    opacity: 0.85;
+    line-height: 1.4;
+  }
+
+  /* === Music status === */
+  .music-display {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--neon-gold);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .music-layer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    margin: 3px 0;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+    border-left: 3px solid #444;
+    font-size: 0.75rem;
+    transition: all 0.3s;
+  }
+
+  .music-layer.active {
+    border-left-color: var(--neon-green);
+    background: rgba(0, 255, 136, 0.1);
+    color: var(--neon-green);
+  }
+
+  .music-layer .layer-icon {
+    margin-right: 6px;
+  }
+
+  .music-layer .layer-status {
+    font-size: 0.7rem;
+    font-family: 'Courier New', monospace;
+  }
+
+  /* Note hint */
+  .note-hint-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    border: 1px solid var(--neon-cyan);
+  }
+
+  .note-hint {
+    font-size: 1.6rem;
+    color: var(--neon-gold);
+    font-weight: 900;
+    transition: all 0.3s;
+  }
+
+  .note-hint.flash {
+    animation: notePop 0.4s ease-out;
+  }
+
+  @keyframes notePop {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { transform: scale(1.5); opacity: 1; color: var(--neon-pink); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .speed-hint {
+    font-size: 0.8rem;
+    color: var(--neon-purple);
+    font-family: 'Courier New', monospace;
+  }
+
+  /* === Sensor log === */
+  .sensor-log {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    border-radius: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    line-height: 1.4;
+  }
+
+  .log-line {
+    color: var(--neon-green);
+    margin: 2px 0;
+    word-break: break-all;
+  }
+
+  .log-line.err { color: var(--neon-red); }
+  .log-line.warn { color: var(--neon-gold); }
+  .log-line.info { color: var(--neon-cyan); }
+
+  /* === Overlay (countdown / fx) === */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .overlay.show { display: flex; }
+
+  .countdown {
+    font-size: 8rem;
+    font-weight: 900;
+    color: var(--neon-gold);
+    text-shadow: 
+      0 0 20px var(--neon-gold),
+      0 0 40px var(--neon-gold);
+    font-family: 'Courier New', monospace;
+    animation: countPop 1s ease-out;
+  }
+
+  @keyframes countPop {
+    0% { transform: scale(0.3); opacity: 0; }
+    30% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* === Result modal === */
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+
+  .modal-bg.show { display: flex; }
+
+  .modal {
+    background: linear-gradient(135deg, #2d1b69 0%, #1e1450 100%);
+    border: 3px solid var(--neon-gold);
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 460px;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+  }
+
+  .modal-trophy {
+    font-size: 4rem;
+    margin-bottom: 10px;
+    animation: trophySpin 2s ease-out;
+  }
+
+  @keyframes trophySpin {
+    0% { transform: scale(0) rotate(-180deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  .modal h2 {
+    color: var(--neon-gold);
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    letter-spacing: 0.15em;
+    border: none;
+    background: transparent;
+  }
+
+  .modal-subtitle {
+    color: var(--text-light);
+    margin-bottom: 20px;
+    opacity: 0.9;
+  }
+
+  .modal-stats {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--neon-purple);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+    font-size: 0.9rem;
+  }
+
+  .stat-row:last-child { border-bottom: none; }
+
+  .stat-label { color: var(--neon-cyan); }
+  .stat-value { color: var(--neon-gold); font-weight: 900; font-family: 'Courier New', monospace; }
+
+  .modal-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--neon-green), #00cc66);
+    color: #0a0a14;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* === Confetti / fireworks === */
+  .firework {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 30;
+    animation: fireworkBurst 1.2s ease-out forwards;
+  }
+
+  @keyframes fireworkBurst {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; }
+  }
+
+  /* === Climber avatar === */
+  .climber {
+    position: absolute;
+    font-size: 1.8rem;
+    z-index: 8;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: top 0.6s cubic-bezier(0.4, 0, 0.2, 1), left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.6));
+  }
+
+  /* === Difficulty selector === */
+  .difficulty-row {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .diff-btn {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--neon-cyan);
+    color: var(--neon-cyan);
+    padding: 6px 4px;
+    border-radius: 5px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+
+  .diff-btn:hover {
+    background: rgba(0, 255, 255, 0.2);
+  }
+
+  .diff-btn.active {
+    background: var(--neon-cyan);
+    color: #0a0a14;
+  }
+
+  /* === Tooltip / legend === */
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    font-size: 0.75rem;
+  }
+
+  .legend-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid;
+  }
+
+  .legend-dot.target { border-color: var(--neon-gold); background: rgba(255, 215, 0, 0.3); box-shadow: 0 0 8px var(--neon-gold); }
+  .legend-dot.route { border-color: var(--neon-blue); background: rgba(0, 212, 255, 0.2); }
+  .legend-dot.success { border-color: var(--neon-green); background: rgba(0, 255, 136, 0.4); }
+  .legend-dot.wrong { border-color: var(--neon-red); background: rgba(255, 51, 102, 0.4); }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Banner -->
+  <div class="banner">
+    <h1>🧗 互動攀岩牆模擬器</h1>
+    <div class="subtitle">CLIMB · THE · BEAT &nbsp;|&nbsp; 50 顆互動岩點 &nbsp;|&nbsp; 90 秒語音挑戰版</div>
+  </div>
+
+  <!-- Main 3-column layout -->
+  <div class="game-layout">
+
+    <!-- LEFT: Control / HUD -->
+    <div class="info-column">
+
+      <div class="panel">
+        <h2>⚡ 即時數據</h2>
+        <div class="hud-grid">
+          <div class="hud-cell">
+            <div class="hud-label">剩餘時間</div>
+            <div class="hud-value time" id="timeDisplay">01:30</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">得分</div>
+            <div class="hud-value score" id="scoreDisplay">0</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">進度</div>
+            <div class="hud-value" id="progressDisplay">0/0</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">失誤</div>
+            <div class="hud-value" id="errorDisplay">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>🎮 互動模式</h2>
+        <div class="mode-grid">
+          <button class="mode-btn active" data-mode="melody">
+            <span class="mode-icon">🎵</span>
+            音樂路線
+          </button>
+          <button class="mode-btn" data-mode="random">
+            <span class="mode-icon">🎲</span>
+            隨機亮點
+          </button>
+          <button class="mode-btn" data-mode="speed">
+            <span class="mode-icon">⚡</span>
+            速度挑戰
+          </button>
+          <button class="mode-btn" data-mode="memory">
+            <span class="mode-icon">🧠</span>
+            記憶模式
+          </button>
+          <button class="mode-btn" data-mode="rhythm">
+            <span class="mode-icon">🥁</span>
+            節奏模式
+          </button>
+          <button class="mode-btn" data-mode="chase">
+            <span class="mode-icon">🔥</span>
+            追逐模式
+          </button>
+        </div>
+
+        <div class="difficulty-row">
+          <button class="diff-btn active" data-diff="easy">簡單</button>
+          <button class="diff-btn" data-diff="normal">普通</button>
+          <button class="diff-btn" data-diff="hard">困難</button>
+        </div>
+
+        <div class="controls">
+          <button class="ctrl-btn" id="btnStart">▶ 開始</button>
+          <button class="ctrl-btn reset" id="btnReset" disabled>⟲ 重置</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>🗺️ 路線資訊</h2>
+        <div class="route-card">
+          <div class="route-name" id="routeName">— 待開始 —</div>
+          <div class="route-desc" id="routeDesc">選擇模式後按「開始」</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>📖 燈號圖例</h2>
+        <div class="legend">
+          <div class="legend-row">
+            <div class="legend-dot target"></div>
+            <span>下一個目標（金色閃爍）</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot route"></div>
+            <span>路線岩點（藍色呼吸）</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot success"></div>
+            <span>已觸發（綠色）</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot wrong"></div>
+            <span>錯誤觸發（紅色）</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CENTER: The Wall -->
+    <div class="wall-container">
+      <div class="wall-header">
+        <div class="wall-title">🪨 攀岩牆 · 50 顆互動岩點</div>
+        <div class="wall-status idle" id="wallStatus">● 待機 IDLE</div>
+      </div>
+
+      <div class="wall" id="wall">
+        <svg class="path-svg" id="pathSvg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+        <div class="climber" id="climber" style="display:none">🧗</div>
+        <div class="overlay" id="overlay">
+          <div class="countdown" id="countdown">3</div>
+        </div>
+      </div>
+
+      <!-- Subtitle bar (below wall) -->
+      <div style="margin-top: 10px;">
+        <div class="subtitle-bar" id="subtitleBar">
+          <div class="subtitle-icon">🎤</div>
+          <div class="subtitle-text" id="subtitleText">準備好了嗎？選擇互動模式，開始你的 90 秒攀岩演奏。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Music & Sensor info -->
+    <div class="info-column">
+
+      <div class="panel">
+        <h2>🎼 音樂層次</h2>
+        <div class="music-display">
+          <div class="music-layer" id="layer-melody">
+            <span><span class="layer-icon">🎵</span>主旋律</span>
+            <span class="layer-status">OFF</span>
+          </div>
+          <div class="music-layer" id="layer-drum">
+            <span><span class="layer-icon">🥁</span>鼓組</span>
+            <span class="layer-status">OFF</span>
+          </div>
+          <div class="music-layer" id="layer-bass">
+            <span><span class="layer-icon">🎸</span>Bass</span>
+            <span class="layer-status">OFF</span>
+          </div>
+          <div class="music-layer" id="layer-chord">
+            <span><span class="layer-icon">🎹</span>和弦</span>
+            <span class="layer-status">OFF</span>
+          </div>
+
+          <div class="note-hint-area">
+            <div class="note-hint" id="noteHint">♪</div>
+            <div class="speed-hint" id="speedHint">— 等待觸發 —</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>📡 感測器日誌</h2>
+        <div class="sensor-log" id="sensorLog">
+          <div class="log-line info">[SYS] 攀岩牆模擬器啟動完成</div>
+          <div class="log-line info">[I2C] 50 顆震動感應器就緒</div>
+          <div class="log-line info">[LED] WS2812B 光圈陣列待機</div>
+          <div class="log-line info">[AUDIO] CF9510M 音訊主機連線中...</div>
+          <div class="log-line">[AUDIO] ✓ 連線成功</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>⚙️ 硬體狀態</h2>
+        <div class="hud-grid">
+          <div class="hud-cell">
+            <div class="hud-label">感應岩點</div>
+            <div class="hud-value" style="font-size:1.1rem;color:#00ff88">50/50</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">LED 光圈</div>
+            <div class="hud-value" style="font-size:1.1rem;color:#00ff88">ONLINE</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">音訊延遲</div>
+            <div class="hud-value" style="font-size:1.1rem;color:#00d4ff" id="latencyDisplay">12ms</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">FPS</div>
+            <div class="hud-value" style="font-size:1.1rem;color:#00d4ff" id="fpsDisplay">60</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Result Modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-trophy" id="modalTrophy">🏆</div>
+    <h2 id="modalTitle">完美通關！</h2>
+    <div class="modal-subtitle" id="modalSubtitle">你完成了所有岩點！</div>
+    <div class="modal-stats">
+      <div class="stat-row"><span class="stat-label">路線長度</span><span class="stat-value" id="statPath">— 顆</span></div>
+      <div class="stat-row"><span class="stat-label">完成數</span><span class="stat-value" id="statStepped">— 顆</span></div>
+      <div class="stat-row"><span class="stat-label">失誤次數</span><span class="stat-value" id="statErrors">— 次</span></div>
+      <div class="stat-row"><span class="stat-label">用時</span><span class="stat-value" id="statTime">—</span></div>
+      <div class="stat-row"><span class="stat-label">最終得分</span><span class="stat-value" id="statScore">—</span></div>
+      <div class="stat-row"><span class="stat-label">路線名稱</span><span class="stat-value" id="statRoute">—</span></div>
+      <div class="stat-row"><span class="stat-label">隱藏旋律</span><span class="stat-value" id="statSong">—</span></div>
+      <div class="stat-row"><span class="stat-label">稱號</span><span class="stat-value" id="statTitle">—</span></div>
+    </div>
+    <button class="modal-btn" id="btnModalClose">繼續挑戰</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============================================================
+// CONFIG
+// ============================================================
+const TOTAL_HOLDS = 50;
+const TOTAL_TIME = 90; // 90 seconds, exhibition-friendly pacing
+const DEBOUNCE_MS = 400;
+
+// Mode definitions
+const MODES = {
+  melody: {
+    name: '🎵 音樂路線模式',
+    desc: '依照路線觸發岩點，每一下都是一個音符，完成路線等於演奏一首旋律',
+    pathLen: { easy: 10, normal: 14, hard: 18 },
+    showPath: true,
+    routeColor: '#00d4ff',
+  },
+  random: {
+    name: '🎲 隨機亮點模式',
+    desc: '岩點會隨機亮起，看誰能在時限內觸發最多',
+    pathLen: { easy: 15, normal: 20, hard: 25 },
+    showPath: false,
+    routeColor: '#ff66cc',
+  },
+  speed: {
+    name: '⚡ 速度挑戰模式',
+    desc: '只亮一條最快路線，越快觸發越高分',
+    pathLen: { easy: 8, normal: 12, hard: 15 },
+    showPath: true,
+    routeColor: '#ff3366',
+  },
+  memory: {
+    name: '🧠 記憶模式',
+    desc: '岩點會閃光一輪，記住順序再依序觸發',
+    pathLen: { easy: 5, normal: 7, hard: 10 },
+    showPath: false,
+    routeColor: '#a855f7',
+  },
+  rhythm: {
+    name: '🥁 節奏模式',
+    desc: '跟著節拍器觸發岩點，越準音樂越完整',
+    pathLen: { easy: 12, normal: 16, hard: 20 },
+    showPath: true,
+    routeColor: '#ffd700',
+  },
+  chase: {
+    name: '🔥 追逐模式',
+    desc: '目標岩點會跳動移位，要在限時內追上它',
+    pathLen: { easy: 10, normal: 15, hard: 20 },
+    showPath: false,
+    routeColor: '#ff8800',
+  },
+};
+
+// Familiar melody note system. Songs are public-domain / traditional-style melodies
+// commonly used for simple educational music interactions.
+const NOTE_FREQ = {
+  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
+  C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00,
+  REST: 0
+};
+const NOTE_LABEL = {
+  C4: 'Do', D4: 'Re', E4: 'Mi', F4: 'Fa', G4: 'Sol', A4: 'La', B4: 'Si',
+  C5: "Do'", D5: "Re'", E5: "Mi'", F5: "Fa'", G5: "Sol'", A5: "La'", REST: '休止'
+};
+const DEFAULT_NOTE_FLOW = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5'];
+
+const SONG_LIBRARY = [
+  {
+    id: 'two_tigers',
+    name: '兩隻老虎',
+    hint: '旋律提示：一首很多人小時候都會唱的輪唱歌。',
+    notes: ['C4','D4','E4','C4','C4','D4','E4','C4','E4','F4','G4','E4','F4','G4','G4','A4','G4','F4','E4','C4']
+  },
+  {
+    id: 'little_bee',
+    name: '小蜜蜂',
+    hint: '旋律提示：一首節奏很規律、常出現在兒童音樂課的歌。',
+    notes: ['G4','E4','E4','F4','D4','D4','C4','D4','E4','F4','G4','G4','G4','G4','E4','E4','F4','D4','D4','C4','E4','G4','G4','E4']
+  },
+  {
+    id: 'london_bridge',
+    name: '倫敦鐵橋',
+    hint: '旋律提示：一首經典兒歌，常搭配遊戲動作。',
+    notes: ['G4','A4','G4','F4','E4','F4','G4','D4','E4','F4','E4','F4','G4','G4','A4','G4','F4','E4','F4','G4','D4','G4','E4','C4']
+  },
+  {
+    id: 'mary_lamb',
+    name: '瑪莉有隻小綿羊',
+    hint: '旋律提示：一首英文兒歌，開頭音型很容易辨識。',
+    notes: ['E4','D4','C4','D4','E4','E4','E4','D4','D4','D4','E4','G4','G4','E4','D4','C4','D4','E4','E4','E4','E4','D4','D4','E4','D4','C4']
+  },
+  {
+    id: 'twinkle_star',
+    name: '小星星',
+    hint: '旋律提示：一首和星星有關、大家很熟悉的兒歌。',
+    notes: ['C4','C4','G4','G4','A4','A4','G4','F4','F4','E4','E4','D4','D4','C4','G4','G4','F4','F4','E4','E4','D4','G4','G4','F4','F4','E4','E4','D4']
+  },
+  {
+    id: 'row_boat',
+    name: '划船歌',
+    hint: '旋律提示：一首有划船意象、節奏平穩的歌。',
+    notes: ['C4','C4','C4','D4','E4','E4','D4','E4','F4','G4','C5','C5','C5','G4','G4','G4','E4','E4','E4','C4','C4','C4','G4','F4','E4','D4','C4']
+  }
+];
+
+const ROUTE_THEMES = [
+  {
+    name: '夢幻星河路線',
+    type: '夢幻路線',
+    vibe: '燈光會像星星一樣一顆一顆亮起，請穩穩接住每一個音符。'
+  },
+  {
+    name: '超級挑戰路線',
+    type: '超級挑戰路線',
+    vibe: '這條路線速度比較刺激，請看準金色岩點再出手。'
+  },
+  {
+    name: '節奏王者路線',
+    type: '節奏挑戰路線',
+    vibe: '每一次正確觸發都會接上一個音，請把整段旋律爬出來。'
+  },
+  {
+    name: '閃電反應路線',
+    type: '速度反應路線',
+    vibe: '光點會考驗你的反應，越穩越容易完成。'
+  },
+  {
+    name: '魔法音符路線',
+    type: '音樂探索路線',
+    vibe: '牆上藏著一首大家聽過的旋律，完成後可以一起猜歌名。'
+  },
+  {
+    name: '勇者登頂路線',
+    type: '勇者挑戰路線',
+    vibe: '請一路往上，完成最後一顆岩點就能登頂。'
+  }
+];
+
+// ============================================================
+// VOICE PACK — V2 展場語音活動內容
+// ============================================================
+const VOICE_PACK = {
+  opening: [
+    '歡迎來到光點節奏攀岩館。本次挑戰是「{routeName}」，屬於「{routeType}」。請跟著金色岩點往上爬，聽看看牆上藏了哪一首旋律。',
+    '各位攀岩家請就位，這裡是光點節奏攀岩館。你抽到的是「{routeName}」，請用手腳把旋律一顆一顆點亮。',
+    '歡迎進入會唱歌的攀岩牆。本次路線名稱是「{routeName}」，玩法是看光點、抓節奏、猜旋律。',
+    '挑戰即將開始，你現在進入「{routeName}」。這是一條{routeType}，請穩定前進，不要被旁邊的岩點誘惑。',
+    '歡迎來到光點節奏攀岩館。今天的指定路線是「{routeName}」，牆上藏著一首熟悉的音樂，完成後請猜出它。',
+    '攀岩家注意，本次開放「{routeName}」。請看準金色光圈，正確觸發才會把音樂接起來。',
+    '這裡是互動音樂攀岩館。你抽到的是「{routeName}」，請一邊攀爬，一邊收集旋律線索。',
+    '歡迎挑戰「{routeName}」。這條{routeType}會用燈光帶你前進，請把隱藏旋律完整爬出來。'
+  ],
+  guess: [
+    '挑戰完成。觀眾請猜猜看，剛剛這段旋律是哪一首歌。',
+    '你聽出來了嗎？這條路線剛剛藏了一首大家很熟悉的旋律。',
+    '現在進入猜旋律時間，請說出剛剛攀岩牆演奏的是哪一首歌。',
+    '完成路線，音樂線索也收集完畢。請猜出這首旋律。'
+  ],
+  reveal: [
+    '公布答案，本次隱藏旋律是「{songName}」。',
+    '答案揭曉，剛剛聽到的是「{songName}」。',
+    '這一回的旋律答案是「{songName}」。'
+  ],
+  ready: [
+    '準備好了嗎？請雙手扶穩，跟著亮起的岩點開始挑戰。',
+    '歡迎來到音樂攀岩牆，等一下每一次觸發，都會變成一段旋律。',
+    '請注意安全，看到金色亮點後，再開始往上移動。',
+    '這不是普通攀岩牆，這是一面會唱歌的攀岩牆。',
+    '選好模式後，挑戰即將開始，請保持距離，不要干擾正在挑戰的玩家。',
+    '等一下請跟著光點前進，踩準節奏，爬出你的音樂路線。',
+    '挑戰開始前，請確認前方空間安全，準備進入攀岩演奏模式。',
+    '攀岩家請就位，音樂、燈光和感應器都準備好了。'
+  ],
+  start: [
+    '開始攀爬，跟著光點往上。',
+    '挑戰開始，請看準金色目標。',
+    '音樂路線啟動，請依序觸發岩點。',
+    '出發，保持節奏，穩定往上。'
+  ],
+  mode: {
+    melody: [
+      '音樂路線模式開始。請依序觸發亮起的岩點，完成一首屬於你的攀岩旋律。',
+      '跟著金色光點往上，每一次正確觸發，都會多一個音符。',
+      '請照順序前進，不要跳點，讓整條路線變成完整的音樂。'
+    ],
+    random: [
+      '隨機亮點模式開始。光點會不斷變換，請快速找到目標。',
+      '注意看，岩點會隨機亮起，反應越快，得分越高。',
+      '這一關考驗你的觀察力和反應速度，看到亮點就出手。'
+    ],
+    speed: [
+      '速度挑戰模式開始。請用最快速度完成指定路線。',
+      '這一關比的是速度和穩定度，快不代表亂，請看準再觸發。',
+      '每一秒都很重要，保持節奏，快速登頂。'
+    ],
+    memory: [
+      '記憶模式開始。請先觀察亮點順序，接著照順序完成挑戰。',
+      '先看清楚，不要急著動，記住剛才亮起的岩點。',
+      '這一關考驗記憶力，請照剛才的順序依序觸發。'
+    ],
+    rhythm: [
+      '節奏模式開始。請跟著節拍觸發岩點，越準確，音樂越完整。',
+      '抓住節奏，不要太快，也不要太慢。',
+      '跟著拍點前進，讓攀岩動作變成一段表演。'
+    ],
+    chase: [
+      '追逐模式開始。目標光點會移動，請在它跑掉前追上它。',
+      '這一關光點不會乖乖等你，請快速判斷下一個位置。',
+      '看準移動中的目標，追上光點，完成挑戰。'
+    ]
+  },
+  correct: [
+    '正確。',
+    '很好，繼續。',
+    '抓到節奏了。',
+    '這一下漂亮。',
+    '命中目標。',
+    '音符亮起來了。',
+    '繼續往上。',
+    '很好，下一個。',
+    '節奏穩住。',
+    '路線正確。',
+    '漂亮觸發。',
+    '音樂接上了。'
+  ],
+  combo: {
+    3: [
+      '三連擊，節奏開始成形。',
+      '連續三次正確，狀態很好。',
+      '三個音符接起來了。'
+    ],
+    5: [
+      '五連擊，整條旋律開始跑起來了。',
+      '連續五次成功，保持這個節奏。',
+      '五個目標完成，表現穩定。'
+    ],
+    8: [
+      '八連擊，已經進入高手節奏。',
+      '連續八次正確，這條路線很順。',
+      '節奏、速度、判斷都在線上。'
+    ],
+    10: [
+      '十連擊，這已經不是攀岩，是現場演出。',
+      '十次正確觸發，接近完美演奏。',
+      '十連成功，準備衝向終點。'
+    ]
+  },
+  wrong: [
+    '走錯了，請回到金色光點。',
+    '這不是目前的目標，請看下一個亮點。',
+    '順序錯誤，先找到正在閃爍的岩點。',
+    '差一點，請重新看準目標。',
+    '踩到錯誤路線了，調整一下。',
+    '不要急，先看清楚再觸發。',
+    '目前目標不是這一顆，請跟著光點走。',
+    '錯誤觸發，保持冷靜。',
+    '小心，這一顆不是指定岩點。',
+    '路線偏掉了，請回到正確節奏。',
+    '別被旁邊的岩點騙了，目標在金色光圈。',
+    '重新抓節奏，下一顆可以追回來。'
+  ],
+  time: {
+    60: [
+      '剩下六十秒，請保持節奏。',
+      '還有一分鐘，穩穩往上。',
+      '六十秒倒數開始，路線還沒結束。'
+    ],
+    45: [
+      '剩下四十五秒，請加快判斷。',
+      '時間正在縮短，注意下一個光點。',
+      '四十五秒，保持速度，也要保持準確。'
+    ],
+    30: [
+      '剩下三十秒，進入最後衝刺。',
+      '三十秒倒數，請抓緊節奏。',
+      '最後三十秒，能爬多少就爬多少。'
+    ],
+    15: [
+      '剩下十五秒，準備衝刺。',
+      '十五秒，專注在下一個目標。',
+      '最後十五秒，不要放掉節奏。'
+    ],
+    5: [
+      '最後五秒。',
+      '五秒倒數，完成最後一擊。',
+      '最後機會，看準目標。'
+    ]
+  },
+  result: {
+    perfect: [
+      '完美登頂，零失誤完成挑戰，你是今天的節奏攀岩王。',
+      '恭喜完成完美路線，每一個音符都接得非常漂亮。',
+      '零失誤通關，這是一場完整的攀岩演奏。'
+    ],
+    success: [
+      '成功登頂，雖然有一點失誤，但整體表現非常穩定。',
+      '挑戰完成，你成功把路線爬完，也把旋律接起來了。',
+      '登頂成功，下一次可以挑戰更高難度。'
+    ],
+    tough: [
+      '成功完成挑戰，過程有點混亂，但你沒有放棄。',
+      '這是一場艱辛登頂，失誤不少，但毅力很強。',
+      '你靠著不放棄完成路線，這一點很重要。'
+    ],
+    timeout: [
+      '時間到，這次沒有完成全部岩點，但你已經抓到節奏了。',
+      '挑戰結束，下一次可以先觀察路線，再加快速度。',
+      '時間結束，建議再挑戰一次，這次會更順。'
+    ]
+  },
+  attract: [
+    '歡迎挑戰互動攀岩牆，跟著光點往上爬，完成你的音樂路線。',
+    '這面牆不只會發光，還會記錄你的速度、節奏和反應。',
+    '準備好了就按下開始，挑戰你的攀岩節奏感。',
+    '想知道自己能不能登頂嗎？選一個模式開始挑戰。',
+    '每一顆岩點都是一個感應器，每一次觸發都是一個音符。',
+    '請排隊等候，正在挑戰的玩家完成後，就輪到下一位。',
+    '觀察、判斷、移動，這就是音樂攀岩牆的挑戰。',
+    '選擇不同模式，會有不同的光點路線和音樂效果。'
+  ]
+};
+
+
+// ============================================================
+// STATE
+// ============================================================
+const GAME = {
+  phase: 'idle',    // idle | countdown | playing | result
+  mode: 'melody',
+  difficulty: 'easy',
+  currentSong: null,
+  currentRoute: null,
+  holds: [],        // [{id, x, y, el}]
+  path: [],         // [id1, id2, ...] - ordered route
+  pathSet: new Set(),
+  steppedSet: new Set(),
+  errorCount: 0,
+  correctStreak: 0,
+  timeAlertsPlayed: new Set(),
+  score: 0,
+  timeLeft: TOTAL_TIME,
+  timer: null,
+  flowId: 0,
+  noteIndex: 0,
+  lastStepTime: 0,
+  lastTrigger: new Map(),
+  audioCtx: null,
+  musicLayers: { melody: false, drum: false, bass: false, chord: false },
+  randomInterval: null,
+  chaseInterval: null,
+  climberPos: null,
+};
+
+// ============================================================
+// DOM HELPERS
+// ============================================================
+const $ = (id) => document.getElementById(id);
+const wall = $('wall');
+const pathSvg = $('pathSvg');
+const climberEl = $('climber');
+const timeDisplay = $('timeDisplay');
+const scoreDisplay = $('scoreDisplay');
+const progressDisplay = $('progressDisplay');
+const errorDisplay = $('errorDisplay');
+const routeName = $('routeName');
+const routeDesc = $('routeDesc');
+const subtitleBar = $('subtitleBar');
+const subtitleText = $('subtitleText');
+const noteHint = $('noteHint');
+const speedHint = $('speedHint');
+const wallStatus = $('wallStatus');
+const sensorLog = $('sensorLog');
+const btnStart = $('btnStart');
+const btnReset = $('btnReset');
+const overlay = $('overlay');
+const countdown = $('countdown');
+
+// ============================================================
+// LOG
+// ============================================================
+function log(msg, type = '') {
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  const t = new Date();
+  const ts = String(t.getHours()).padStart(2,'0') + ':' +
+             String(t.getMinutes()).padStart(2,'0') + ':' +
+             String(t.getSeconds()).padStart(2,'0');
+  line.textContent = '[' + ts + '] ' + msg;
+  sensorLog.appendChild(line);
+  sensorLog.scrollTop = sensorLog.scrollHeight;
+  // Keep only last 50 lines
+  while (sensorLog.children.length > 50) {
+    sensorLog.removeChild(sensorLog.firstChild);
+  }
+}
+
+// ============================================================
+// AUDIO
+// ============================================================
+function ensureAudio() {
+  if (!GAME.audioCtx) {
+    try {
+      GAME.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) { return null; }
+  }
+  if (GAME.audioCtx.state === 'suspended') GAME.audioCtx.resume();
+  return GAME.audioCtx;
+}
+
+function playTone(freq, duration = 0.3, type = 'sine', vol = 0.2) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + duration);
+}
+
+const SFX = {
+  note: (idx) => {
+    const info = getSongNote(idx);
+    if (!info.freq) return;
+    playTone(info.freq, 0.42, 'sine', 0.18);
+    playTone(info.freq * 2, 0.18, 'sine', 0.055);
+  },
+  wrong: () => {
+    playTone(180, 0.15, 'sawtooth', 0.2);
+    setTimeout(() => playTone(120, 0.2, 'sawtooth', 0.2), 80);
+  },
+  victory: () => {
+    ['C4','E4','G4','C5'].forEach((code, idx) => {
+      setTimeout(() => playTone(NOTE_FREQ[code], 0.3, 'triangle', 0.2), idx * 120);
+    });
+    setTimeout(() => playTone(NOTE_FREQ.E5, 0.6, 'triangle', 0.25), 500);
+  },
+  countdown: () => playTone(440, 0.15, 'square', 0.15),
+  start: () => {
+    playTone(523, 0.1, 'square', 0.2);
+    setTimeout(() => playTone(784, 0.3, 'square', 0.2), 100);
+  },
+};
+
+// ============================================================
+// SUBTITLE / VOICE
+// ============================================================
+function setSubtitle(text, speaking = false) {
+  subtitleText.textContent = text;
+  if (speaking) subtitleBar.classList.add('speaking');
+  else subtitleBar.classList.remove('speaking');
+}
+
+function speak(text, opts = {}) {
+  setSubtitle(text, true);
+  if ('speechSynthesis' in window) {
+    if (opts.interrupt) window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-TW';
+    u.rate = opts.rate || 1.1;
+    u.pitch = opts.pitch || 1.0;
+    u.onend = () => setSubtitle(text, false);
+    window.speechSynthesis.speak(u);
+  } else {
+    setTimeout(() => setSubtitle(text, false), 2000);
+  }
+}
+
+function pickRandom(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function speakRandom(list, opts = {}) {
+  const text = pickRandom(list);
+  if (!text) return '';
+  speak(text, opts);
+  return text;
+}
+
+function formatTemplate(text, data = {}) {
+  return String(text || '').replace(/\{(\w+)\}/g, (_, key) => data[key] ?? '');
+}
+
+function speakRandomTemplate(list, data = {}, opts = {}) {
+  const raw = pickRandom(list);
+  const text = formatTemplate(raw, data);
+  if (!text) return '';
+  speak(text, opts);
+  return text;
+}
+
+function getActiveSong() {
+  return GAME.currentSong || SONG_LIBRARY[0];
+}
+
+function getSongNote(idx) {
+  const song = getActiveSong();
+  const seq = song.notes && song.notes.length ? song.notes : DEFAULT_NOTE_FLOW;
+  const code = seq[idx % seq.length];
+  return {
+    code,
+    label: NOTE_LABEL[code] || code,
+    freq: NOTE_FREQ[code] || 0,
+    song
+  };
+}
+
+function chooseRouteAndSong() {
+  GAME.currentRoute = pickRandom(ROUTE_THEMES) || ROUTE_THEMES[0];
+  GAME.currentSong = pickRandom(SONG_LIBRARY) || SONG_LIBRARY[0];
+  log('[ROUTE] 本次路線：' + GAME.currentRoute.name + ' / ' + GAME.currentRoute.type, 'info');
+  log('[MUSIC] 隱藏旋律已選定：' + GAME.currentSong.name, 'info');
+}
+
+function speakOpeningIntro() {
+  const route = GAME.currentRoute || ROUTE_THEMES[0];
+  const mode = MODES[GAME.mode] || MODES.melody;
+  const data = {
+    routeName: route.name,
+    routeType: route.type,
+    routeVibe: route.vibe,
+    modeName: mode.name,
+    songHint: getActiveSong().hint
+  };
+  const opening = speakRandomTemplate(VOICE_PACK.opening, data, { interrupt: true, rate: 1.08, pitch: 1.05 });
+  setTimeout(() => {
+    if (GAME.phase === 'countdown' || GAME.phase === 'playing' || GAME.phase === 'idle') {
+      setSubtitle(route.vibe + ' ' + getActiveSong().hint, false);
+    }
+  }, 2200);
+  return opening;
+}
+
+function handleTimeVoice() {
+  if (GAME.phase !== 'playing') return;
+  const list = VOICE_PACK.time[GAME.timeLeft];
+  if (!list || GAME.timeAlertsPlayed.has(GAME.timeLeft)) return;
+  GAME.timeAlertsPlayed.add(GAME.timeLeft);
+  speakRandom(list, { interrupt: true, rate: 1.12 });
+  log('[VOICE] 時間提醒：剩餘 ' + GAME.timeLeft + ' 秒', 'warn');
+}
+
+function speakModeIntro(modeKey) {
+  const list = VOICE_PACK.mode[modeKey] || VOICE_PACK.ready;
+  return speakRandom(list, { interrupt: true, rate: 1.08 });
+}
+
+
+// ============================================================
+// BUILD WALL — 50 holds at semi-random positions
+// ============================================================
+function generateHoldPositions() {
+  // Strategy: divide the wall into a 7-col x 9-row pseudo-grid, then place
+  // ~50 holds with random offsets so it looks natural (like a real climbing wall)
+  // and avoids overlaps.
+  const positions = [];
+  const cols = 7;
+  const rows = 9;
+  const cellW = 100 / cols;
+  const cellH = 100 / rows;
+
+  // Use a deterministic-ish seed feeling by iterating cells and skipping some
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      // Probability of placing a hold in this cell
+      const prob = (r === 0 || r === rows - 1) ? 0.65 : 0.85;
+      if (Math.random() > prob) continue;
+      if (positions.length >= TOTAL_HOLDS) break;
+      // Center within cell + jitter
+      const jx = (Math.random() - 0.5) * cellW * 0.55;
+      const jy = (Math.random() - 0.5) * cellH * 0.55;
+      const x = cellW * c + cellW / 2 + jx;
+      const y = cellH * r + cellH / 2 + jy;
+      // Skip edges
+      if (x < 5 || x > 95 || y < 5 || y > 95) continue;
+      positions.push({ x, y });
+    }
+    if (positions.length >= TOTAL_HOLDS) break;
+  }
+
+  // If we don't have enough, fill with random
+  while (positions.length < TOTAL_HOLDS) {
+    positions.push({
+      x: 5 + Math.random() * 90,
+      y: 5 + Math.random() * 90,
+    });
+  }
+
+  // Trim to exactly 50
+  return positions.slice(0, TOTAL_HOLDS);
+}
+
+function buildWall() {
+  // Clear existing
+  wall.querySelectorAll('.hold').forEach(h => h.remove());
+  GAME.holds = [];
+
+  const positions = generateHoldPositions();
+  positions.forEach((pos, i) => {
+    const hold = document.createElement('div');
+    hold.className = 'hold';
+    hold.dataset.id = i;
+    hold.dataset.state = 'idle';
+    
+    // Size variation (small holds = harder, big = jugs)
+    const size = 22 + Math.random() * 18;
+    hold.style.width = size + 'px';
+    hold.style.height = size + 'px';
+    hold.style.left = pos.x + '%';
+    hold.style.top = pos.y + '%';
+
+    const body = document.createElement('div');
+    body.className = 'hold-body';
+    const label = document.createElement('div');
+    label.className = 'hold-label';
+    label.textContent = i + 1;
+    body.appendChild(label);
+
+    const ring = document.createElement('div');
+    ring.className = 'hold-ring';
+
+    hold.appendChild(body);
+    hold.appendChild(ring);
+
+    hold.addEventListener('click', onHoldClick);
+    wall.appendChild(hold);
+
+    GAME.holds.push({ id: i, x: pos.x, y: pos.y, el: hold, size });
+  });
+
+  // Some random twinkles for idle decoration
+  GAME.holds.forEach(h => {
+    if (Math.random() < 0.25) h.el.dataset.twinkle = 'true';
+  });
+
+  log('[WALL] 50 顆岩點配置完成', 'info');
+}
+
+// ============================================================
+// PATH GENERATION
+// ============================================================
+function setHoldState(id, state) {
+  const h = GAME.holds[id];
+  if (!h) return;
+  h.el.dataset.state = state;
+}
+
+function clearAllHolds() {
+  GAME.holds.forEach(h => {
+    h.el.dataset.state = 'idle';
+    h.el.dataset.twinkle = Math.random() < 0.25 ? 'true' : 'false';
+  });
+  pathSvg.innerHTML = '';
+  climberEl.style.display = 'none';
+}
+
+function generatePath(length) {
+  // Build a path that goes from BOTTOM to TOP, with reasonable spacing
+  // Sort holds by Y (descending = bottom first)
+  const sorted = [...GAME.holds].sort((a, b) => b.y - a.y);
+
+  // Pick starting hold from bottom 20%
+  const startCandidates = sorted.filter(h => h.y > 75);
+  const start = startCandidates[Math.floor(Math.random() * startCandidates.length)] || sorted[0];
+
+  const path = [start.id];
+  const used = new Set([start.id]);
+  let current = start;
+
+  while (path.length < length) {
+    // Find nearest unused holds that are higher OR at similar height
+    const candidates = GAME.holds
+      .filter(h => !used.has(h.id))
+      .map(h => {
+        const dx = h.x - current.x;
+        const dy = current.y - h.y; // positive = h is higher
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        // Prefer upward movement
+        const score = dist + (dy < 0 ? 50 : 0) + (Math.abs(dx) > 25 ? 15 : 0);
+        return { hold: h, dist, score };
+      })
+      .filter(c => c.dist < 35) // reachable distance
+      .sort((a, b) => a.score - b.score);
+
+    if (candidates.length === 0) break;
+
+    // Pick one of the top 3 closest (some randomness)
+    const pick = candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
+    path.push(pick.hold.id);
+    used.add(pick.hold.id);
+    current = pick.hold;
+  }
+
+  return path;
+}
+
+function drawPathLines(routeColor) {
+  pathSvg.innerHTML = '';
+  if (!MODES[GAME.mode].showPath) return;
+  
+  // Draw connecting lines between consecutive path holds
+  for (let i = 0; i < GAME.path.length - 1; i++) {
+    const a = GAME.holds[GAME.path[i]];
+    const b = GAME.holds[GAME.path[i + 1]];
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', a.x);
+    line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x);
+    line.setAttribute('y2', b.y);
+    line.setAttribute('class', 'path-line');
+    line.setAttribute('stroke', routeColor);
+    pathSvg.appendChild(line);
+  }
+}
+
+// ============================================================
+// EFFECTS
+// ============================================================
+function spawnRipple(holdId) {
+  const h = GAME.holds[holdId];
+  if (!h) return;
+  const ripple = document.createElement('div');
+  ripple.className = 'ripple';
+  ripple.style.left = h.x + '%';
+  ripple.style.top = h.y + '%';
+  wall.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 700);
+}
+
+function spawnNoteFloat(holdId, noteText) {
+  const h = GAME.holds[holdId];
+  if (!h) return;
+  const note = document.createElement('div');
+  note.className = 'note-pop';
+  note.textContent = '♪ ' + noteText;
+  note.style.left = h.x + '%';
+  note.style.top = h.y + '%';
+  wall.appendChild(note);
+  setTimeout(() => note.remove(), 1200);
+}
+
+function fireworksBurst(centerX, centerY, count = 16) {
+  const colors = ['#ffd700', '#ff66cc', '#00d4ff', '#00ff88', '#ff3366', '#a855f7'];
+  for (let i = 0; i < count; i++) {
+    const fw = document.createElement('div');
+    fw.className = 'firework';
+    const angle = (Math.PI * 2 * i) / count;
+    const dist = 60 + Math.random() * 60;
+    fw.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    fw.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+    fw.style.background = colors[Math.floor(Math.random() * colors.length)];
+    fw.style.left = centerX + '%';
+    fw.style.top = centerY + '%';
+    fw.style.boxShadow = '0 0 8px ' + fw.style.background;
+    wall.appendChild(fw);
+    setTimeout(() => fw.remove(), 1200);
+  }
+}
+
+function moveClimberTo(holdId) {
+  const h = GAME.holds[holdId];
+  if (!h) return;
+  climberEl.style.display = 'block';
+  climberEl.style.left = h.x + '%';
+  climberEl.style.top = h.y + '%';
+  GAME.climberPos = h;
+}
+
+function flashNoteHint(noteName) {
+  noteHint.textContent = '♪ ' + noteName;
+  noteHint.classList.remove('flash');
+  void noteHint.offsetWidth;
+  noteHint.classList.add('flash');
+
+  const now = performance.now();
+  const interval = GAME.lastStepTime > 0 ? now - GAME.lastStepTime : 1500;
+  let label, color;
+  if (interval < 500) { label = '🔥 連發旋律！'; color = '#ff66cc'; }
+  else if (interval < 1000) { label = '🎶 節奏中'; color = '#00ff88'; }
+  else if (interval < 2000) { label = '🎼 正常'; color = '#00d4ff'; }
+  else { label = '⏸ 慢板'; color = '#a855f7'; }
+  speedHint.textContent = label;
+  speedHint.style.color = color;
+}
+
+// ============================================================
+// MUSIC LAYERS
+// ============================================================
+function updateMusicLayer(name, active) {
+  GAME.musicLayers[name] = active;
+  const el = $('layer-' + name);
+  if (!el) return;
+  if (active) {
+    el.classList.add('active');
+    el.querySelector('.layer-status').textContent = '● PLAYING';
+  } else {
+    el.classList.remove('active');
+    el.querySelector('.layer-status').textContent = 'OFF';
+  }
+}
+
+function updateMusicLayers() {
+  const progress = GAME.path.length ? GAME.steppedSet.size / GAME.path.length : 0;
+  updateMusicLayer('melody', progress > 0);
+  updateMusicLayer('drum',   progress >= 0.25);
+  updateMusicLayer('bass',   progress >= 0.5);
+  updateMusicLayer('chord',  progress >= 0.75);
+}
+
+// ============================================================
+// PHASE MGMT
+// ============================================================
+function setPhase(p) {
+  GAME.phase = p;
+  if (p === 'idle') {
+    wallStatus.textContent = '● 待機 IDLE';
+    wallStatus.className = 'wall-status idle';
+  } else if (p === 'countdown') {
+    wallStatus.textContent = '● 倒數中...';
+    wallStatus.className = 'wall-status warning';
+  } else if (p === 'playing') {
+    wallStatus.textContent = '● 進行中 PLAYING';
+    wallStatus.className = 'wall-status playing';
+  } else if (p === 'result') {
+    wallStatus.textContent = '● 結算 RESULT';
+    wallStatus.className = 'wall-status warning';
+  }
+}
+
+// ============================================================
+// MODE SELECTOR
+// ============================================================
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (GAME.phase !== 'idle') return;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    GAME.mode = btn.dataset.mode;
+    const mode = MODES[GAME.mode];
+    routeName.textContent = mode.name;
+    routeDesc.textContent = mode.desc;
+    log('[MODE] 切換至 ' + mode.name, 'info');
+  });
+});
+
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (GAME.phase !== 'idle') return;
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    GAME.difficulty = btn.dataset.diff;
+    log('[DIFF] 難度設定: ' + GAME.difficulty, 'info');
+  });
+});
+
+// ============================================================
+// START / RESET
+// ============================================================
+btnStart.addEventListener('click', startGame);
+btnReset.addEventListener('click', resetGame);
+$('btnModalClose').addEventListener('click', () => {
+  $('modalBg').classList.remove('show');
+  resetGame();
+});
+
+async function startGame() {
+  GAME.flowId++;
+  const myFlow = GAME.flowId;
+
+  ensureAudio();
+
+  // Reset state
+  GAME.steppedSet.clear();
+  GAME.errorCount = 0;
+  GAME.correctStreak = 0;
+  GAME.timeAlertsPlayed.clear();
+  GAME.score = 0;
+  GAME.noteIndex = 0;
+  GAME.timeLeft = TOTAL_TIME;
+  GAME.lastStepTime = 0;
+  GAME.lastTrigger.clear();
+  clearAllHolds();
+  Object.keys(GAME.musicLayers).forEach(k => updateMusicLayer(k, false));
+  if (GAME.randomInterval) { clearInterval(GAME.randomInterval); GAME.randomInterval = null; }
+  if (GAME.chaseInterval) { clearInterval(GAME.chaseInterval); GAME.chaseInterval = null; }
+
+  chooseRouteAndSong();
+
+  // Generate path
+  const mode = MODES[GAME.mode];
+  const pathLen = mode.pathLen[GAME.difficulty];
+  GAME.path = generatePath(pathLen);
+  GAME.pathSet = new Set(GAME.path);
+
+  log('[ROUTE] 生成路線：' + GAME.path.length + ' 顆岩點', 'info');
+  log('[MODE] 模式：' + mode.name, 'info');
+
+  routeName.textContent = GAME.currentRoute.name;
+  routeDesc.textContent = mode.name + ' · ' + GAME.currentRoute.type + ' · 路線長度 ' + GAME.path.length + ' · 隱藏旋律挑戰';
+  progressDisplay.textContent = '0/' + GAME.path.length;
+  scoreDisplay.textContent = '0';
+  errorDisplay.textContent = '0';
+  errorDisplay.classList.remove('warn', 'crit');
+
+  // Apply mode-specific visualization
+  if (mode.showPath) {
+    GAME.path.forEach(id => setHoldState(id, 'route'));
+    setHoldState(GAME.path[0], 'target');
+    drawPathLines(mode.routeColor);
+  } else if (GAME.mode === 'memory') {
+    // Opening route voice first, then flash sequence and hide
+    speakOpeningIntro();
+    await sleep(3200);
+    if (myFlow !== GAME.flowId) return;
+    speakModeIntro('memory');
+    await sleep(900);
+    await flashMemorySequence(myFlow);
+    if (myFlow !== GAME.flowId) return;
+  } else if (GAME.mode === 'random') {
+    // Will randomly light holds during play
+    setHoldState(GAME.path[0], 'target');
+  } else if (GAME.mode === 'chase') {
+    setHoldState(GAME.path[0], 'target');
+  }
+
+  if (GAME.mode !== 'memory') {
+    speakOpeningIntro();
+    await sleep(3200);
+    if (myFlow !== GAME.flowId) return;
+    speakModeIntro(GAME.mode);
+    await sleep(900);
+    if (myFlow !== GAME.flowId) return;
+  }
+
+  btnStart.disabled = true;
+  btnReset.disabled = false;
+  document.querySelectorAll('.mode-btn').forEach(b => b.disabled = true);
+
+  // Countdown
+  setPhase('countdown');
+  await runCountdown(myFlow);
+  if (myFlow !== GAME.flowId) return;
+
+  setPhase('playing');
+  GAME.lastStepTime = performance.now();
+  speakRandom(VOICE_PACK.start, { interrupt: true, rate: 1.12 });
+
+  // Set up mode-specific timers
+  if (GAME.mode === 'random') startRandomMode();
+  if (GAME.mode === 'chase') startChaseMode();
+
+  // Main timer
+  GAME.timer = setInterval(() => {
+    GAME.timeLeft--;
+    updateTimeDisplay();
+    handleTimeVoice();
+    if (GAME.timeLeft <= 30) timeDisplay.classList.add('warn');
+    if (GAME.timeLeft <= 10) {
+      timeDisplay.classList.remove('warn');
+      timeDisplay.classList.add('crit');
+      if (GAME.timeLeft > 0 && GAME.timeLeft <= 5) SFX.countdown();
+    }
+    if (GAME.timeLeft <= 0) endGame('timeout', myFlow);
+  }, 1000);
+}
+
+async function flashMemorySequence(flowId) {
+  overlay.classList.remove('show');
+  for (let i = 0; i < GAME.path.length; i++) {
+    if (flowId !== GAME.flowId) return;
+    const id = GAME.path[i];
+    setHoldState(id, 'target');
+    SFX.note(i);
+    spawnRipple(id);
+    flashNoteHint(getSongNote(i).label);
+    await sleep(450);
+    setHoldState(id, 'idle');
+    await sleep(120);
+  }
+  await sleep(400);
+  setSubtitle('現在輪到你！照剛剛的順序觸發每顆岩點！', false);
+  setHoldState(GAME.path[0], 'target');
+}
+
+function startRandomMode() {
+  let curIdx = 0;
+  const advance = () => {
+    if (GAME.phase !== 'playing') return;
+    // If current target hasn't been hit, mark as missed
+    const targetId = GAME.path[curIdx];
+    if (targetId !== undefined && !GAME.steppedSet.has(targetId)) {
+      // Auto-skip (miss penalty)
+      setHoldState(targetId, 'idle');
+    }
+    curIdx++;
+    if (curIdx >= GAME.path.length) {
+      // Loop back to keep things active
+      curIdx = 0;
+    }
+    setHoldState(GAME.path[curIdx], 'target');
+  };
+  const dur = GAME.difficulty === 'easy' ? 3500 : GAME.difficulty === 'normal' ? 2500 : 1500;
+  GAME.randomInterval = setInterval(advance, dur);
+}
+
+function startChaseMode() {
+  const dur = GAME.difficulty === 'easy' ? 4000 : GAME.difficulty === 'normal' ? 3000 : 2000;
+  GAME.chaseInterval = setInterval(() => {
+    if (GAME.phase !== 'playing') return;
+    // The target moves to a nearby random hold
+    const cur = GAME.path[GAME.steppedSet.size];
+    if (cur === undefined) return;
+    setHoldState(cur, 'idle');
+    // Pick a random hold near current as new target (but not yet stepped)
+    const candidates = GAME.holds
+      .filter(h => !GAME.steppedSet.has(h.id))
+      .filter(h => {
+        const dx = h.x - GAME.holds[cur].x;
+        const dy = h.y - GAME.holds[cur].y;
+        return Math.sqrt(dx*dx + dy*dy) < 30;
+      });
+    if (candidates.length > 0) {
+      const newTarget = candidates[Math.floor(Math.random() * candidates.length)];
+      // Replace path entry
+      GAME.path[GAME.steppedSet.size] = newTarget.id;
+      GAME.pathSet = new Set(GAME.path);
+      setHoldState(newTarget.id, 'target');
+    } else {
+      setHoldState(cur, 'target');
+    }
+  }, dur);
+}
+
+async function runCountdown(flowId) {
+  overlay.classList.add('show');
+  for (let n = 3; n >= 1; n--) {
+    if (flowId !== GAME.flowId) return;
+    countdown.textContent = n;
+    countdown.style.animation = 'none';
+    void countdown.offsetWidth;
+    countdown.style.animation = '';
+    SFX.countdown();
+    await sleep(800);
+  }
+  if (flowId !== GAME.flowId) return;
+  countdown.textContent = 'GO!';
+  countdown.style.color = '#00ff88';
+  SFX.start();
+  await sleep(700);
+  countdown.style.color = '';
+  overlay.classList.remove('show');
+}
+
+function updateTimeDisplay() {
+  const m = Math.floor(GAME.timeLeft / 60);
+  const s = GAME.timeLeft % 60;
+  timeDisplay.textContent =
+    String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+// ============================================================
+// CLICK HANDLER (simulates sensor trigger)
+// ============================================================
+function onHoldClick(e) {
+  if (GAME.phase !== 'playing') return;
+  const id = parseInt(e.currentTarget.dataset.id, 10);
+  
+  // Debounce
+  const now = performance.now();
+  const last = GAME.lastTrigger.get(id) || 0;
+  if (now - last < DEBOUNCE_MS) return;
+  GAME.lastTrigger.set(id, now);
+
+  const hold = GAME.holds[id];
+  log('[SENSOR #' + (id+1) + '] 觸發 @ x=' + hold.x.toFixed(0) + ',y=' + hold.y.toFixed(0));
+
+  // Is this hold in the path?
+  if (!GAME.pathSet.has(id)) {
+    handleWrong(id);
+    return;
+  }
+
+  // Is it the next expected hold?
+  const expected = GAME.path[GAME.steppedSet.size];
+  if (id !== expected) {
+    handleWrong(id, '順序錯誤！');
+    return;
+  }
+
+  handleCorrect(id);
+}
+
+function handleCorrect(id) {
+  GAME.steppedSet.add(id);
+  GAME.correctStreak++;
+  setHoldState(id, 'success');
+  
+  // Pop animation
+  const el = GAME.holds[id].el;
+  el.classList.remove('pop');
+  void el.offsetWidth;
+  el.classList.add('pop');
+  
+  spawnRipple(id);
+  moveClimberTo(id);
+
+  // Music note: use current hidden familiar melody
+  const noteIdx = GAME.noteIndex;
+  const noteInfo = getSongNote(noteIdx);
+  SFX.note(noteIdx);
+  spawnNoteFloat(id, noteInfo.label);
+  flashNoteHint(noteInfo.label);
+  GAME.noteIndex++;
+  GAME.lastStepTime = performance.now();
+
+  // Score
+  GAME.score += 100 - (GAME.errorCount * 5);
+  scoreDisplay.textContent = GAME.score;
+
+  // Progress
+  progressDisplay.textContent = GAME.steppedSet.size + '/' + GAME.path.length;
+  updateMusicLayers();
+
+  log('[HIT ✓] 第 ' + GAME.steppedSet.size + ' 個正確岩點 (#' + (id+1) + ') · ' + getActiveSong().name + ' / 音符 ' + noteInfo.label, 'info');
+
+  if (VOICE_PACK.combo[GAME.correctStreak]) {
+    speakRandom(VOICE_PACK.combo[GAME.correctStreak], { interrupt: true, rate: 1.12 });
+  } else if (GAME.steppedSet.size % 2 === 0 && GAME.steppedSet.size < GAME.path.length) {
+    speakRandom(VOICE_PACK.correct, { interrupt: false, rate: 1.15 });
+  }
+
+  // Highlight next target
+  if (GAME.steppedSet.size < GAME.path.length) {
+    const nextId = GAME.path[GAME.steppedSet.size];
+    setHoldState(nextId, 'target');
+  } else {
+    // Victory!
+    endGame('victory', GAME.flowId);
+  }
+}
+
+function handleWrong(id, reason) {
+  GAME.correctStreak = 0;
+  GAME.errorCount++;
+  errorDisplay.textContent = GAME.errorCount;
+  if (GAME.errorCount >= 3) {
+    errorDisplay.classList.remove('warn');
+    errorDisplay.classList.add('crit');
+  } else if (GAME.errorCount >= 1) {
+    errorDisplay.classList.add('warn');
+  }
+
+  const prevState = GAME.holds[id].el.dataset.state;
+  setHoldState(id, 'wrong');
+  SFX.wrong();
+  log('[ERR ✗] 失誤 #' + GAME.errorCount + ' @ 岩點 ' + (id+1) + ' (' + (reason || '不在路線上') + ')', 'err');
+  
+  // Restore previous state after a brief flash
+  setTimeout(() => {
+    if (GAME.phase !== 'playing') return;
+    if (GAME.pathSet.has(id)) {
+      // If it's the current target, keep it as target
+      const expected = GAME.path[GAME.steppedSet.size];
+      if (id === expected) setHoldState(id, 'target');
+      else setHoldState(id, 'route');
+    } else {
+      setHoldState(id, 'idle');
+    }
+  }, 700);
+
+  // Voice feedback, randomized for exhibition replay value
+  speakRandom(VOICE_PACK.wrong, { interrupt: true, rate: 1.2 });
+}
+
+// ============================================================
+// END GAME
+// ============================================================
+async function endGame(reason, flowId) {
+  if (flowId !== GAME.flowId) return;
+  setPhase('result');
+  clearInterval(GAME.timer);
+  GAME.timer = null;
+  if (GAME.randomInterval) { clearInterval(GAME.randomInterval); GAME.randomInterval = null; }
+  if (GAME.chaseInterval) { clearInterval(GAME.chaseInterval); GAME.chaseInterval = null; }
+  btnStart.disabled = true;
+
+  const elapsed = TOTAL_TIME - GAME.timeLeft;
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+
+  let title, subtitle, trophy, badge, voiceMsg;
+
+  if (reason === 'victory') {
+    SFX.victory();
+    if (GAME.errorCount === 0) {
+      title = '完美登頂！'; trophy = '🏆'; badge = '頂尖攀岩家';
+      subtitle = '零失誤！你的演奏完美無瑕！';
+      voiceMsg = pickRandom(VOICE_PACK.result.perfect);
+    } else if (GAME.errorCount <= 2) {
+      title = '成功登頂！'; trophy = '🌟'; badge = '勇敢挑戰者';
+      subtitle = '失誤 ' + GAME.errorCount + ' 次，依然抵達終點！';
+      voiceMsg = pickRandom(VOICE_PACK.result.success);
+    } else {
+      title = '艱辛登頂！'; trophy = '💪'; badge = '不放棄的攀岩魂';
+      subtitle = '失誤 ' + GAME.errorCount + ' 次，永不放棄！';
+      voiceMsg = pickRandom(VOICE_PACK.result.tough);
+    }
+    fireworksBurst(50, 30);
+    await sleep(300);
+    fireworksBurst(30, 50);
+    await sleep(300);
+    fireworksBurst(70, 50);
+  } else {
+    title = '時間到！'; trophy = '⏰'; badge = '時間挑戰者';
+    subtitle = '完成 ' + GAME.steppedSet.size + '/' + GAME.path.length + ' 顆，下次更快！';
+    voiceMsg = pickRandom(VOICE_PACK.result.timeout);
+  }
+
+  log('[RESULT] ' + title + ' · 用時 ' + m + ':' + String(s).padStart(2,'0') + ' · 得分 ' + GAME.score + ' · 隱藏旋律 ' + getActiveSong().name, 'info');
+  speak(voiceMsg + ' ' + pickRandom(VOICE_PACK.guess), { rate: 1.1, interrupt: true });
+
+  await sleep(2600);
+  speakRandomTemplate(VOICE_PACK.reveal, { songName: getActiveSong().name }, { interrupt: true, rate: 1.08 });
+
+  await sleep(1200);
+
+  // Show modal
+  $('modalTrophy').textContent = trophy;
+  $('modalTitle').textContent = title;
+  $('modalSubtitle').textContent = subtitle + ' 隱藏旋律：' + getActiveSong().name;
+  $('statPath').textContent = GAME.path.length + ' 顆';
+  $('statStepped').textContent = GAME.steppedSet.size + ' 顆';
+  $('statErrors').textContent = GAME.errorCount + ' 次';
+  $('statTime').textContent = m + ':' + String(s).padStart(2,'0');
+  $('statScore').textContent = GAME.score;
+  $('statRoute').textContent = GAME.currentRoute ? GAME.currentRoute.name : '—';
+  $('statSong').textContent = getActiveSong().name;
+  $('statTitle').textContent = badge;
+  $('modalBg').classList.add('show');
+}
+
+function resetGame() {
+  GAME.flowId++;
+  clearInterval(GAME.timer); GAME.timer = null;
+  if (GAME.randomInterval) { clearInterval(GAME.randomInterval); GAME.randomInterval = null; }
+  if (GAME.chaseInterval) { clearInterval(GAME.chaseInterval); GAME.chaseInterval = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+  GAME.steppedSet.clear();
+  GAME.errorCount = 0;
+  GAME.correctStreak = 0;
+  GAME.timeAlertsPlayed.clear();
+  GAME.score = 0;
+  GAME.noteIndex = 0;
+  GAME.timeLeft = TOTAL_TIME;
+  GAME.currentSong = null;
+  GAME.currentRoute = null;
+  GAME.lastTrigger.clear();
+
+  clearAllHolds();
+  Object.keys(GAME.musicLayers).forEach(k => updateMusicLayer(k, false));
+
+  routeName.textContent = MODES[GAME.mode].name;
+  routeDesc.textContent = MODES[GAME.mode].desc;
+  progressDisplay.textContent = '0/0';
+  scoreDisplay.textContent = '0';
+  errorDisplay.textContent = '0';
+  errorDisplay.classList.remove('warn', 'crit');
+  timeDisplay.classList.remove('warn', 'crit');
+  updateTimeDisplay();
+  noteHint.textContent = '♪';
+  speedHint.textContent = '— 等待觸發 —';
+  speedHint.style.color = '#a855f7';
+
+  btnStart.disabled = false;
+  btnReset.disabled = true;
+  document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
+  $('modalBg').classList.remove('show');
+
+  setPhase('idle');
+  setSubtitle(pickRandom(VOICE_PACK.ready), false);
+  log('[SYS] 系統重置完成', 'info');
+}
+
+// ============================================================
+// UTIL
+// ============================================================
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ============================================================
+// INIT
+// ============================================================
+buildWall();
+updateTimeDisplay();
+routeName.textContent = MODES.melody.name;
+routeDesc.textContent = MODES.melody.desc;
+
+// Simulated latency / FPS jitter for realism
+setInterval(() => {
+  const lat = 8 + Math.floor(Math.random() * 8);
+  $('latencyDisplay').textContent = lat + 'ms';
+  const fps = 58 + Math.floor(Math.random() * 4);
+  $('fpsDisplay').textContent = fps;
+}, 1500);
+
+// Periodic "background sensor noise" log for realism
+setInterval(() => {
+  if (GAME.phase !== 'playing' && Math.random() < 0.3) {
+    const msgs = [
+      '[I2C] 心跳檢測 OK',
+      '[LED] 光圈呼吸循環中',
+      '[AUDIO] CF9510M 待機',
+      '[I2C] 50/50 感應器健康',
+    ];
+    log(msgs[Math.floor(Math.random() * msgs.length)]);
+  }
+}, 8000);
+
+// Attract mode voice: only runs in idle/result, kept sparse to avoid noise.
+setInterval(() => {
+  if (GAME.phase !== 'idle') return;
+  if (document.hidden) return;
+  if (Math.random() < 0.45) {
+    const text = pickRandom(VOICE_PACK.attract);
+    setSubtitle(text, false);
+    log('[VOICE] 待機吸引語：' + text, 'info');
+  }
+}, 28000);
+
+</script>
+</body>
+</html>
