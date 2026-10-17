@@ -1,0 +1,33 @@
+{
+  "project_id": "P012",
+  "github_repository_id": 1241413415,
+  "title_en": "Interactive Climbing Wall",
+  "title_zh": "互動攀岩牆",
+  "category": "install",
+  "topics": [
+    "climbing",
+    "simulation"
+  ],
+  "repository_full_name": "jackeytw886/Fcli",
+  "repository_url": "https://github.com/jackeytw886/Fcli",
+  "default_branch": "main",
+  "visibility": "public",
+  "aliases": [],
+  "suggested_name": "install-climbing-wall",
+  "repository_status": "connected",
+  "content_state": "source-present",
+  "lifecycle": "unknown",
+  "pages_enabled": true,
+  "deployment_url": "https://jackeytw886.github.io/Fcli",
+  "event_year": null,
+  "entry_paths": [
+    "index.html"
+  ],
+  "related_project_ids": [],
+  "handoff_path": "HANDOFF.md",
+  "verification_source": "github-tree-and-readme",
+  "verified_at": "2026-10-17T20:41:56+08:00",
+  "source_baseline_sha": "befc918ec4bf5e772c53706716dd44821fac8749",
+  "last_runtime_verified_sha": null,
+  "naming_status": "preserved-for-pages"
+}
